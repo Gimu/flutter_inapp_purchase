@@ -13,6 +13,7 @@ import com.amazon.device.iap.model.PurchaseUpdatesResponse;
 import com.amazon.device.iap.model.Receipt;
 import com.amazon.device.iap.model.RequestId;
 import com.amazon.device.iap.model.UserDataResponse;
+import com.amazon.device.iap.model.UserData;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,6 +40,7 @@ public class AmazonInappPurchasePlugin implements MethodCallHandler {
   private final String TAG = "InappPurchasePlugin";
   private Result result = null;
   private static MethodChannel channel;
+  private UserData userData;
 
   /** Plugin registration. */
   public static void registerWith(Registrar registrar) {
@@ -118,6 +120,8 @@ public class AmazonInappPurchasePlugin implements MethodCallHandler {
   private PurchasingListener purchasesUpdatedListener = new PurchasingListener() {
     @Override
     public void onUserDataResponse(UserDataResponse userDataResponse) {
+      // Called by PurchasingService.getUserData()
+      userData = userDataResponse.getUserData();
       Log.d(TAG, "oudr="+userDataResponse.toString());
     }
 
@@ -205,11 +209,13 @@ public class AmazonInappPurchasePlugin implements MethodCallHandler {
           try {
             JSONObject item = getPurchaseData(receipt.getSku(),
                   receipt.getReceiptId(),
-                  receipt.getReceiptId(),
+                  userData.getUserId(),
                   transactionDate.doubleValue());
             Log.d(TAG, "opr Putting "+item.toString());
             result.success(item.toString());
             channel.invokeMethod("purchase-updated", item.toString());
+          } catch (NullPointerException e) {
+            result.error(TAG, "E_USER_ERROR", e.getMessage());
           } catch (JSONException e) {
             result.error(TAG, "E_BILLING_RESPONSE_JSON_PARSE_ERROR", e.getMessage());
           }
@@ -236,13 +242,15 @@ public class AmazonInappPurchasePlugin implements MethodCallHandler {
               Long transactionDate=date.getTime();
               JSONObject item = getPurchaseData(receipt.getSku(),
                       receipt.getReceiptId(),
-                      receipt.getReceiptId(),
+                      userData.getUserId(),
                       transactionDate.doubleValue());
 
               Log.d(TAG, "opudr Putting "+item.toString());
               items.put(item);
             }
             result.success(items.toString());
+          } catch (NullPointerException e) {
+            result.error(TAG, "E_USER_ERROR", e.getMessage());
           } catch (JSONException e) {
             result.error(TAG, "E_BILLING_RESPONSE_JSON_PARSE_ERROR", e.getMessage());
           }
